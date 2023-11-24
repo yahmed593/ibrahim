@@ -1,7 +1,12 @@
 {
+  "id": 4,
       "coffee": {
-        "id": 3
+        "id": 3,
+        "name": "latte",
+        "sona": "dndnnd"
+
       },
-      "quantity": 2
+      "quantity": 4,
+
   }
   
