@@ -44,9 +44,10 @@ function readJsonFile(filePath: string): CoffeeOrder {
     items: {
       coffee: {
         id: coffeeId,
-        name: parsedContent.name,
+        ...parsedContent.coffee, // Include additional coffee properties
       },
       quantity: parsedContent.quantity,
+      ...parsedContent, // Include additional properties
     },
   };
 }
@@ -69,10 +70,7 @@ function combineOrdersFromFolders(
 
 function printCombinedOrders(orders: CoffeeOrder[]): OrderConfig {
   const itemsArray = orders.map((order) => ({
-    coffee: {
-      id: order.items.coffee.id,
-    },
-    quantity: order.items.quantity,
+    ...order.items,
   }));
 
   console.log(JSON.stringify({ items: itemsArray }, null, 2));
