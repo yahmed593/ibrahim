@@ -2,15 +2,14 @@ import * as path from "path";
 import * as fs from "fs";
 import { Construct } from "constructs";
 import { App, TerraformStack } from "cdktf";
+import { provider } from "@cdktf/provider-hashicups";
 import { order } from "@cdktf/provider-hashicups";
-
-// Coffee Order Combiner code
 
 interface CoffeeOrder {
   items: {
     coffee: {
       id: number;
-      name?: string;
+      name?: String;
     };
     quantity: number;
   };
@@ -20,10 +19,17 @@ interface OrderConfig {
   items: {
     coffee: {
       id: number;
-      name?: string;
+      name?: String;
     };
     quantity: number;
   }[];
+}
+
+function getSubfoldersInFolder(folderPath: string): string[] {
+  const subfolders = fs.readdirSync(folderPath);
+  return subfolders.filter((subfolder) =>
+    fs.statSync(path.join(folderPath, subfolder)).isDirectory()
+  );
 }
 
 function readJsonFile(filePath: string): CoffeeOrder {
@@ -36,10 +42,9 @@ function readJsonFile(filePath: string): CoffeeOrder {
     items: {
       coffee: {
         id: coffeeId,
-        ...parsedContent.coffee,
+        name: parsedContent.name,
       },
       quantity: parsedContent.quantity,
-      ...parsedContent,
     },
   };
 }
@@ -49,62 +54,49 @@ function getJsonFilesInFolder(folderPath: string): string[] {
   return files.filter((file) => file.endsWith(".json"));
 }
 
-function combineOrdersFromFolders(ordersFolder: string): CoffeeOrder[] {
-  const allOrders: CoffeeOrder[] = [];
-
-  const folders = fs.readdirSync(ordersFolder);
-
-  for (const folder of folders) {
-    const folderPath = path.join(ordersFolder, folder);
-
-    if (fs.statSync(folderPath).isDirectory()) {
-      const orderFiles = getJsonFilesInFolder(folderPath);
-      const orders = orderFiles.map((file) => readJsonFile(path.join(folderPath, file)));
-      allOrders.push(...orders);
-    }
-  }
-
-  return allOrders;
-}function getSubfoldersInFolder(folderPath: string): string[] {
-  const subfolders = fs.readdirSync(folderPath);
-  return subfolders.filter((subfolder) =>
-    fs.statSync(path.join(folderPath, subfolder)).isDirectory()
-  );
+function combineOrdersFromFolders(
+  ordersFolder: string,
+  username: string
+): CoffeeOrder[] {
+  const folderPath = path.join(ordersFolder, username);
+  const jsonFiles = getJsonFilesInFolder(folderPath);
+  const orderFiles = jsonFiles.map((file) => path.join(folderPath, file));
+  const orders = orderFiles.map((filePath) => readJsonFile(filePath));
+  return orders;
 }
 
-function printCombinedOrders(orders: CoffeeOrder[], fileNames: string[]): OrderConfig[] {
-  const orderConfigs: OrderConfig[] = [];
+function printCombinedOrders(orders: CoffeeOrder[]): OrderConfig {
+  const itemsArray = orders.map((order) => ({
+    coffee: {
+      id: order.items.coffee.id,
+    },
+    quantity: order.items.quantity,
+  }));
 
-  for (let i = 0; i < orders.length; i++) {
-    const order = orders[i];
-    const fileName = fileNames[i];
-    const itemsArray = [order.items];
+  console.log(JSON.stringify({ items: itemsArray }, null, 2));
 
-    console.log(`File: ${fileName}`);
-    console.log(JSON.stringify({ items: itemsArray }, null, 2));
-
-    orderConfigs.push({ items: itemsArray });
-  }
-
-  return orderConfigs;
+  return { items: itemsArray };
 }
 
-class MyStack extends TerraformStack {
+export class MyStack extends TerraformStack {
   constructor(scope: Construct, id: string) {
     super(scope, id);
 
-    const ordersFolder = "src/orders";
-    const folderNames = getSubfoldersInFolder(ordersFolder);
-    const combinedOrders = combineOrdersFromFolders(ordersFolder);
-    const orderConfigs = printCombinedOrders(combinedOrders, folderNames);
+    new provider.HashicupsProvider(this, "yacycoffe");
 
-    for (let i = 0; i < folderNames.length; i++) {
-      const folderName = path.basename(path.dirname(folderNames[i])); 
-      new order.Order(this, folderName, orderConfigs[i]);
+    // Run the Coffee Order Combiner for a specific user (e.g., "yasmeen")
+    const ordersFolder = "src/orders";
+    const folderNamesList = getSubfoldersInFolder(ordersFolder);
+
+    for (let i = 0; i < folderNamesList.length; i++) {
+      const username = folderNamesList[i];
+      const combinedOrders = combineOrdersFromFolders(ordersFolder, username);
+      const orderConfig = printCombinedOrders(combinedOrders);
+
+      new order.Order(this, username, orderConfig);
     }
   }
 }
-
 
 const app = new App();
 new MyStack(app, "iac");
